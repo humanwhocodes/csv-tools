@@ -1,7 +1,7 @@
 {
-  "name": "@humanwhocodes/replace-me",
+  "name": "@humanwhocodes/csv-tools",
   "version": "0.0.0",
-  "description": "Replace me",
+  "description": "CSV stream processing tools for counting rows and chunking data",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -49,9 +49,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/humanwhocodes/replace-me.git"
+    "url": "git+https://github.com/humanwhocodes/csv-tools.git"
   },
-  "keywords": [],
+  "keywords": [
+    "csv",
+    "stream",
+    "chunk",
+    "parser",
+    "streaming"
+  ],
   "author": "Nicholas C. Zaks",
   "license": "Apache-2.0",
   "devDependencies": {
