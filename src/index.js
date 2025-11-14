@@ -6,12 +6,15 @@
 /* @ts-self-types="./index.d.ts" */
 
 /**
- * Counts all of the data rows in a CSV file (excludes header row).
- * Trailing newline characters must not count as rows.
+ * Counts rows in a CSV file with configurable options.
  * @param {ReadableStream<Uint8Array>} stream - The readable stream containing CSV data
- * @returns {Promise<number>} The count of data rows
+ * @param {Object} options - Options for counting
+ * @param {boolean} [options.countHeaderRow=false] - Whether to count the header row
+ * @param {boolean} [options.countEmptyRows=false] - Whether to count empty rows
+ * @returns {Promise<number>} The count of rows
  */
-export async function countDataRows(stream) {
+export async function countRows(stream, options = {}) {
+	const { countHeaderRow = false, countEmptyRows = false } = options;
 	const reader = stream.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
@@ -24,9 +27,13 @@ export async function countDataRows(stream) {
 
 			if (done) {
 				// Process any remaining data in the buffer
-				if (buffer.length > 0 && buffer.trim() !== "") {
-					if (!isFirstRow) {
-						rowCount++;
+				if (buffer.length > 0) {
+					const isEmpty = buffer.trim() === "";
+
+					if (!isEmpty || countEmptyRows) {
+						if (!isFirstRow || countHeaderRow) {
+							rowCount++;
+						}
 					}
 				}
 
@@ -43,9 +50,15 @@ export async function countDataRows(stream) {
 
 				buffer = buffer.substring(newlineIndex + 1);
 
-				// Skip empty lines and count non-header rows
-				if (line.trim() !== "") {
+				const isEmpty = line.trim() === "";
+
+				// Count based on options
+				if (!isEmpty || countEmptyRows) {
 					if (isFirstRow) {
+						if (countHeaderRow) {
+							rowCount++;
+						}
+
 						isFirstRow = false;
 					} else {
 						rowCount++;
@@ -61,15 +74,27 @@ export async function countDataRows(stream) {
 }
 
 /**
+ * Counts all of the data rows in a CSV file (excludes header row).
+ * Trailing newline characters and empty rows are not counted.
+ * @deprecated Use countRows() instead with options for more control
+ * @param {ReadableStream<Uint8Array>} stream - The readable stream containing CSV data
+ * @returns {Promise<number>} The count of data rows
+ */
+export async function countDataRows(stream) {
+	return countRows(stream, { countHeaderRow: false, countEmptyRows: false });
+}
+
+/**
  * A generator function that yields strings of mini CSV files.
  * Each chunk is a string containing the header row followed by chunkSize data rows.
  * @param {ReadableStream<Uint8Array>} stream - The readable stream containing CSV data
  * @param {Object} options - Options for chunking
  * @param {number} [options.chunkSize=100] - Number of data rows per chunk
+ * @param {boolean} [options.includeEmptyRows=false] - Whether to include empty rows
  * @returns {AsyncGenerator<string>} Generator yielding CSV chunks
  */
 export async function* chunk(stream, options = {}) {
-	const { chunkSize = 100 } = options;
+	const { chunkSize = 100, includeEmptyRows = false } = options;
 	const reader = stream.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
@@ -82,11 +107,17 @@ export async function* chunk(stream, options = {}) {
 
 			if (done) {
 				// Process any remaining data in the buffer
-				if (buffer.length > 0 && buffer.trim() !== "") {
+				if (buffer.length > 0) {
+					const isEmpty = buffer.trim() === "";
+
 					if (header === null) {
-						header = buffer.trim();
+						if (!isEmpty || includeEmptyRows) {
+							header = buffer.trim();
+						}
 					} else {
-						currentChunk.push(buffer.trim());
+						if (!isEmpty || includeEmptyRows) {
+							currentChunk.push(buffer.trim());
+						}
 					}
 				}
 
@@ -108,8 +139,10 @@ export async function* chunk(stream, options = {}) {
 
 				buffer = buffer.substring(newlineIndex + 1);
 
-				// Skip empty lines
-				if (line.trim() === "") {
+				const isEmpty = line.trim() === "";
+
+				// Skip empty lines unless includeEmptyRows is true
+				if (isEmpty && !includeEmptyRows) {
 					continue;
 				}
 
