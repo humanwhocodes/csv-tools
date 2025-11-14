@@ -4,7 +4,7 @@
  */
 
 import assert from "node:assert";
-import { countDataRows, countRows, chunk } from "../dist/index.js";
+import { countRows, chunk } from "../dist/index.js";
 
 /**
  * Helper function to create a ReadableStream from a string
@@ -22,77 +22,6 @@ function createStreamFromString(text) {
 		},
 	});
 }
-
-describe("countDataRows", () => {
-	it("should count data rows excluding header", async () => {
-		const csv = "name,age\nAlice,30\nBob,25\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 3);
-	});
-
-	it("should return 0 for CSV with only header", async () => {
-		const csv = "name,age";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 0);
-	});
-
-	it("should return 0 for empty CSV", async () => {
-		const csv = "";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 0);
-	});
-
-	it("should not count trailing newline as a row", async () => {
-		const csv = "name,age\nAlice,30\nBob,25\n";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 2);
-	});
-
-	it("should not count multiple trailing newlines as rows", async () => {
-		const csv = "name,age\nAlice,30\nBob,25\n\n\n";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 2);
-	});
-
-	it("should handle CSV with single data row", async () => {
-		const csv = "name,age\nAlice,30";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 1);
-	});
-
-	it("should skip empty lines in the middle", async () => {
-		const csv = "name,age\nAlice,30\n\nBob,25\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 3);
-	});
-
-	it("should handle large CSV file", async () => {
-		let csv = "name,age\n";
-
-		for (let i = 0; i < 1000; i++) {
-			csv += `Person${i},${20 + i}\n`;
-		}
-
-		const stream = createStreamFromString(csv);
-		const count = await countDataRows(stream);
-
-		assert.strictEqual(count, 1000);
-	});
-});
 
 describe("chunk", () => {
 	it("should yield chunks with default chunkSize of 100", async () => {

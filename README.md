@@ -10,34 +10,20 @@ A collection of tools for processing CSV files using streams. This package provi
 
 ## Installation
 
-### npm
-
 ```shell
 npm install @humanwhocodes/csv-tools
-```
-
-### JSR
-
-```shell
-npx jsr add @humanwhocodes/csv-tools
-```
-
-### Deno
-
-```shell
-deno add jsr:@humanwhocodes/csv-tools
 ```
 
 ## Usage
 
 This package exports two main functions for working with CSV data via `ReadableStream` objects:
 
-### `countDataRows(stream)`
+### `countRows(stream, options)`
 
-Counts all of the data rows in a CSV file, excluding the header row. Trailing newline characters and empty lines are not counted as rows.
+Counts rows in a CSV file with configurable options.
 
 ```javascript
-import { countDataRows } from "@humanwhocodes/csv-tools";
+import { countRows } from "@humanwhocodes/csv-tools";
 
 // From a file in Node.js
 import { createReadStream } from "node:fs";
@@ -45,15 +31,26 @@ import { ReadableStream } from "node:stream/web";
 
 const fileStream = createReadStream("data.csv");
 const webStream = ReadableStream.from(fileStream);
-const count = await countDataRows(webStream);
-console.log(`Found ${count} data rows`);
+
+// Count only data rows (exclude header)
+const dataRowCount = await countRows(webStream);
+console.log(`Found ${dataRowCount} data rows`);
+
+// Count all rows including header
+const fileStream2 = createReadStream("data.csv");
+const webStream2 = ReadableStream.from(fileStream2);
+const totalRowCount = await countRows(webStream2, { countHeaderRow: true });
+console.log(`Found ${totalRowCount} total rows`);
 ```
 
 **Parameters:**
 
 - `stream` (`ReadableStream<Uint8Array>`) - A readable stream containing CSV data
+- `options` (`Object`, optional) - Configuration options
+    - `countHeaderRow` (`boolean`, default: `false`) - Whether to count the header row
+    - `countEmptyRows` (`boolean`, default: `false`) - Whether to count empty rows
 
-**Returns:** `Promise<number>` - The count of data rows in the CSV file
+**Returns:** `Promise<number>` - The count of rows in the CSV file
 
 ### `chunk(stream, options)`
 
@@ -83,25 +80,57 @@ for await (const csvChunk of chunk(webStream, { chunkSize: 50 })) {
 - `stream` (`ReadableStream<Uint8Array>`) - A readable stream containing CSV data
 - `options` (`Object`) - Configuration options
     - `chunkSize` (`number`, optional) - Number of data rows per chunk. Default: 100
+    - `includeEmptyRows` (`boolean`, optional) - Whether to include empty rows. Default: false
 
 **Returns:** `AsyncGenerator<string>` - An async generator yielding CSV chunks as strings
 
 ### Example: Browser Usage
 
 ```javascript
-import { countDataRows, chunk } from "@humanwhocodes/csv-tools";
+import { countRows, chunk } from "@humanwhocodes/csv-tools";
 
 // Fetch CSV from URL
 const response = await fetch("https://example.com/data.csv");
-const stream = response.body;
+const reader = response.body.getReader();
+const stream = new ReadableStream({
+	start(controller) {
+		return pump();
+		function pump() {
+			return reader.read().then(({ done, value }) => {
+				if (done) {
+					controller.close();
+					return;
+				}
+				controller.enqueue(value);
+				return pump();
+			});
+		}
+	},
+});
 
 // Count rows
-const rowCount = await countDataRows(stream);
+const rowCount = await countRows(stream);
 console.log(`Total rows: ${rowCount}`);
 
 // Or process in chunks
 const response2 = await fetch("https://example.com/data.csv");
-for await (const csvChunk of chunk(response2.body, { chunkSize: 100 })) {
+const reader2 = response2.body.getReader();
+const stream2 = new ReadableStream({
+	start(controller) {
+		return pump();
+		function pump() {
+			return reader2.read().then(({ done, value }) => {
+				if (done) {
+					controller.close();
+					return;
+				}
+				controller.enqueue(value);
+				return pump();
+			});
+		}
+	},
+});
+for await (const csvChunk of chunk(stream2, { chunkSize: 100 })) {
 	// Process each chunk
 	await processData(csvChunk);
 }

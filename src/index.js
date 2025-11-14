@@ -74,17 +74,6 @@ export async function countRows(stream, options = {}) {
 }
 
 /**
- * Counts all of the data rows in a CSV file (excludes header row).
- * Trailing newline characters and empty rows are not counted.
- * @deprecated Use countRows() instead with options for more control
- * @param {ReadableStream<Uint8Array>} stream - The readable stream containing CSV data
- * @returns {Promise<number>} The count of data rows
- */
-export async function countDataRows(stream) {
-	return countRows(stream, { countHeaderRow: false, countEmptyRows: false });
-}
-
-/**
  * A generator function that yields strings of mini CSV files.
  * Each chunk is a string containing the header row followed by chunkSize data rows.
  * @param {ReadableStream<Uint8Array>} stream - The readable stream containing CSV data
