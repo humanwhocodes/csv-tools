@@ -1,6 +1,6 @@
 {
   "name": "@humanwhocodes/csv-tools",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "CSV stream processing tools for counting rows and chunking data",
   "type": "module",
   "main": "dist/index.js",
