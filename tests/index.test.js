@@ -7,20 +7,22 @@ import assert from "node:assert";
 import { countRows, chunk } from "../dist/index.js";
 
 /**
- * Helper function to create a ReadableStream from a string
- * @param {string} text - The text to convert to a stream
- * @returns {ReadableStream<Uint8Array>} A readable stream
+ * Helper function to create a ReadableStreamDefaultReader from a string
+ * @param {string} text - The text to convert to a stream reader
+ * @returns {ReadableStreamDefaultReader<Uint8Array>} A readable stream reader
  */
-function createStreamFromString(text) {
+function createReaderFromString(text) {
 	const encoder = new TextEncoder();
 	const data = encoder.encode(text);
 
-	return new ReadableStream({
+	const stream = new ReadableStream({
 		start(controller) {
 			controller.enqueue(data);
 			controller.close();
 		},
 	});
+
+	return stream.getReader();
 }
 
 describe("chunk", () => {
@@ -31,10 +33,10 @@ describe("chunk", () => {
 			csv += `Person${i},${20 + i}\n`;
 		}
 
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream)) {
+		for await (const chunkData of chunk(reader)) {
 			chunks.push(chunkData);
 		}
 
@@ -61,10 +63,10 @@ describe("chunk", () => {
 
 	it("should yield chunks with custom chunkSize", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\nCharlie,35\nDavid,40\nEve,28";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 2 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 2 })) {
 			chunks.push(chunkData);
 		}
 
@@ -82,10 +84,10 @@ describe("chunk", () => {
 
 	it("should handle CSV with only header", async () => {
 		const csv = "name,age";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream)) {
+		for await (const chunkData of chunk(reader)) {
 			chunks.push(chunkData);
 		}
 
@@ -94,10 +96,10 @@ describe("chunk", () => {
 
 	it("should handle empty CSV", async () => {
 		const csv = "";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream)) {
+		for await (const chunkData of chunk(reader)) {
 			chunks.push(chunkData);
 		}
 
@@ -106,10 +108,10 @@ describe("chunk", () => {
 
 	it("should handle CSV with single data row", async () => {
 		const csv = "name,age\nAlice,30";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream)) {
+		for await (const chunkData of chunk(reader)) {
 			chunks.push(chunkData);
 		}
 
@@ -119,10 +121,10 @@ describe("chunk", () => {
 
 	it("should skip empty lines", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 2 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 2 })) {
 			chunks.push(chunkData);
 		}
 
@@ -133,10 +135,10 @@ describe("chunk", () => {
 
 	it("should not include trailing newlines in chunks", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\n";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 2 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 2 })) {
 			chunks.push(chunkData);
 		}
 
@@ -146,10 +148,10 @@ describe("chunk", () => {
 
 	it("should handle exact multiple of chunkSize", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\nCharlie,35\nDavid,40";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 2 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 2 })) {
 			chunks.push(chunkData);
 		}
 
@@ -161,10 +163,10 @@ describe("chunk", () => {
 	it("should preserve header in each chunk", async () => {
 		const csv =
 			"id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n3,Charlie,charlie@example.com";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 1 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 1 })) {
 			chunks.push(chunkData);
 		}
 
@@ -179,10 +181,10 @@ describe("chunk", () => {
 
 	it("should include empty rows when includeEmptyRows is true", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, {
+		for await (const chunkData of chunk(reader, {
 			chunkSize: 3,
 			includeEmptyRows: true,
 		})) {
@@ -203,10 +205,10 @@ describe("chunk", () => {
 
 	it("should skip empty rows by default", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
+		const reader = createReaderFromString(csv);
 		const chunks = [];
 
-		for await (const chunkData of chunk(stream, { chunkSize: 3 })) {
+		for await (const chunkData of chunk(reader, { chunkSize: 3 })) {
 			chunks.push(chunkData);
 		}
 
@@ -225,40 +227,40 @@ describe("chunk", () => {
 describe("countRows", () => {
 	it("should count data rows excluding header by default", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream);
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader);
 
 		assert.strictEqual(count, 3);
 	});
 
 	it("should count header row when countHeaderRow is true", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countHeaderRow: true });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countHeaderRow: true });
 
 		assert.strictEqual(count, 4);
 	});
 
 	it("should not count empty rows by default", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream);
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader);
 
 		assert.strictEqual(count, 3);
 	});
 
 	it("should count empty rows when countEmptyRows is true", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countEmptyRows: true });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countEmptyRows: true });
 
 		assert.strictEqual(count, 5); // 3 data rows + 2 empty rows
 	});
 
 	it("should count both header and empty rows when both options are true", async () => {
 		const csv = "name,age\nAlice,30\n\nBob,25\n\nCharlie,35";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, {
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, {
 			countHeaderRow: true,
 			countEmptyRows: true,
 		});
@@ -268,48 +270,48 @@ describe("countRows", () => {
 
 	it("should not count trailing newlines as rows", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\n";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream);
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader);
 
 		assert.strictEqual(count, 2);
 	});
 
 	it("should not count trailing newlines as empty rows even when countEmptyRows is true", async () => {
 		const csv = "name,age\nAlice,30\nBob,25\n";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countEmptyRows: true });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countEmptyRows: true });
 
 		assert.strictEqual(count, 2); // 2 data rows, trailing newline is not a row
 	});
 
 	it("should count multiple consecutive empty rows when countEmptyRows is true", async () => {
 		const csv = "name,age\nAlice,30\n\n\nBob,25";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countEmptyRows: true });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countEmptyRows: true });
 
 		assert.strictEqual(count, 4); // 2 data rows + 2 empty rows (header not counted)
 	});
 
 	it("should return 0 for empty CSV", async () => {
 		const csv = "";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream);
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader);
 
 		assert.strictEqual(count, 0);
 	});
 
 	it("should return 0 for CSV with only header when countHeaderRow is false", async () => {
 		const csv = "name,age";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countHeaderRow: false });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countHeaderRow: false });
 
 		assert.strictEqual(count, 0);
 	});
 
 	it("should return 1 for CSV with only header when countHeaderRow is true", async () => {
 		const csv = "name,age";
-		const stream = createStreamFromString(csv);
-		const count = await countRows(stream, { countHeaderRow: true });
+		const reader = createReaderFromString(csv);
+		const count = await countRows(reader, { countHeaderRow: true });
 
 		assert.strictEqual(count, 1);
 	});
