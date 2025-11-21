@@ -6,6 +6,23 @@
 /* @ts-self-types="./index.d.ts" */
 
 /**
+ * Helper function to make a ReadableStreamDefaultReader async iterable
+ * @param {ReadableStreamDefaultReader<Uint8Array>} reader - The reader to make iterable
+ * @returns {AsyncGenerator<Uint8Array>} An async generator that yields values from the reader
+ */
+async function* makeReaderIterable(reader) {
+	while (true) {
+		const { done, value } = await reader.read();
+
+		if (done) {
+			break;
+		}
+
+		yield value;
+	}
+}
+
+/**
  * Counts rows in a CSV file with configurable options.
  * @param {ReadableStreamDefaultReader<Uint8Array>} reader - The readable stream reader containing CSV data
  * @param {Object} options - Options for counting
@@ -20,24 +37,7 @@ export async function countRows(reader, options = {}) {
 	let rowCount = 0;
 	let isFirstRow = true;
 
-	while (true) {
-		const { done, value } = await reader.read();
-
-		if (done) {
-			// Process any remaining data in the buffer
-			if (buffer.length > 0) {
-				const isEmpty = buffer.trim() === "";
-
-				if (!isEmpty || countEmptyRows) {
-					if (!isFirstRow || countHeaderRow) {
-						rowCount++;
-					}
-				}
-			}
-
-			break;
-		}
-
+	for await (const value of makeReaderIterable(reader)) {
 		buffer += decoder.decode(value, { stream: true });
 
 		// Process complete lines
@@ -65,6 +65,17 @@ export async function countRows(reader, options = {}) {
 		}
 	}
 
+	// Process any remaining data in the buffer
+	if (buffer.length > 0) {
+		const isEmpty = buffer.trim() === "";
+
+		if (!isEmpty || countEmptyRows) {
+			if (!isFirstRow || countHeaderRow) {
+				rowCount++;
+			}
+		}
+	}
+
 	return rowCount;
 }
 
@@ -84,33 +95,7 @@ export async function* chunk(reader, options = {}) {
 	let header = null;
 	let currentChunk = [];
 
-	while (true) {
-		const { done, value } = await reader.read();
-
-		if (done) {
-			// Process any remaining data in the buffer
-			if (buffer.length > 0) {
-				const isEmpty = buffer.trim() === "";
-
-				if (header === null) {
-					if (!isEmpty || includeEmptyRows) {
-						header = buffer.trim();
-					}
-				} else {
-					if (!isEmpty || includeEmptyRows) {
-						currentChunk.push(buffer.trim());
-					}
-				}
-			}
-
-			// Yield any remaining rows
-			if (currentChunk.length > 0 && header !== null) {
-				yield header + "\n" + currentChunk.join("\n");
-			}
-
-			break;
-		}
-
+	for await (const value of makeReaderIterable(reader)) {
 		buffer += decoder.decode(value, { stream: true });
 
 		// Process complete lines
@@ -141,5 +126,25 @@ export async function* chunk(reader, options = {}) {
 				}
 			}
 		}
+	}
+
+	// Process any remaining data in the buffer
+	if (buffer.length > 0) {
+		const isEmpty = buffer.trim() === "";
+
+		if (header === null) {
+			if (!isEmpty || includeEmptyRows) {
+				header = buffer.trim();
+			}
+		} else {
+			if (!isEmpty || includeEmptyRows) {
+				currentChunk.push(buffer.trim());
+			}
+		}
+	}
+
+	// Yield any remaining rows
+	if (currentChunk.length > 0 && header !== null) {
+		yield header + "\n" + currentChunk.join("\n");
 	}
 }
